@@ -1,0 +1,160 @@
+local loadstring = loadstring or load
+local scriptCode = [[
+-- Roblox 透视与穿墙脚本
+-- 按 P 开关透视，N 开关穿墙
+
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+-- 配置设置
+local Config = {
+    ESPEnabled = false,      -- 透视功能
+    NoclipEnabled = false,   -- 穿墙功能
+    ESPKey = Enum.KeyCode.P,                -- 透视快捷键
+    NoclipKey = Enum.KeyCode.N,             -- 穿墙快捷键
+    MaxDistance = 1000,                     -- 透视最大距离
+    ShowNames = true,                       -- 显示玩家名称
+    ShowDistance = true,                    -- 显示距离
+    ShowBoxes = true,                       -- 显示方框
+    ShowTracers = false,                    -- 显示射线
+    TeamCheck = false                       -- 是否只显示敌人
+}
+
+-- 存储透视框的表格
+local ESPObjects = {}
+local NoclipParts = {}
+local NoclipConnection
+
+-- 创建通知函数
+local function Notify(title, message, duration)
+    duration = duration or 3
+    game.StarterGui:SetCore("SendNotification", {
+        Title = title,
+        Text = message,
+        Duration = duration
+    })
+end
+
+-- ========== 穿墙功能 ==========
+local function ToggleNoclip()
+    Config.NoclipEnabled = not Config.NoclipEnabled
+    
+    if Config.NoclipEnabled then
+        -- 启用穿墙
+        NoclipParts = {}
+        
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                table.insert(NoclipParts, part)
+                part.CanCollide = false
+            end
+        end
+        
+        NoclipConnection = RunService.Stepped:Connect(function()
+            if not Config.NoclipEnabled then return end
+            
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+        
+        Notify("穿墙", "已启用", 2)
+    else
+        -- 禁用穿墙
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
+            NoclipConnection = nil
+        end
+        
+        for _, part in pairs(NoclipParts) do
+            if part and part.Parent then
+                part.CanCollide = true
+            end
+        end
+        
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+        
+        NoclipParts = {}
+        Notify("穿墙", "已禁用", 2)
+    end
+end
+
+-- ========== 透视功能 ==========
+local function CreateESP(player)
+    if ESPObjects[player] then return end
+    if player == Player then return end
+    if not player.Character then return end
+    
+    local char = player.Character
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local head = char:FindFirstChild("Head")
+    
+    if not root then return end
+    
+    local espFolder = Instance.new("Folder")
+    espFolder.Name = "ESP_" .. player.Name
+    espFolder.Parent = Workspace.CurrentCamera
+    
+    -- 创建方框
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "Box"
+    box.Adornee = root
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Size = Vector3.new(4, 6, 1)
+    box.Color3 = player.TeamColor == Player.TeamColor and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+    box.Transparency = 0.5
+    box.Visible = Config.ShowBoxes
+    box.Parent = espFolder
+    
+    -- 创建名称标签
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NameTag"
+    billboard.Adornee = head or root
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Parent = espFolder
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextSize = 14
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.Parent = billboard
+    
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Name = "Distance"
+    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    distanceLabel.TextStrokeTransparency = 0
+    distanceLabel.TextSize = 12
+    distanceLabel.Font = Enum.Font.SourceSans
+    distanceLabel.Parent = billboard
+    
+    -- 创建射线
+    local tracer = Instance.new("Frame")
+    tracer.Name = "Tracer"
+    tracer.BackgroundColor3 = Color3.fromRGB(255
